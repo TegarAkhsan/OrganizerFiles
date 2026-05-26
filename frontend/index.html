@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI File Organizer - Desktop</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="ambient-glow-1"></div>
+    <div class="ambient-glow-2"></div>
+
+    <!-- Sidebar Navigation -->
+    <aside>
+        <div class="brand-section">
+            <div class="brand-logo">
+                <svg viewBox="0 0 24 24">
+                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+                </svg>
+            </div>
+            <div class="brand-name">AI Organizer</div>
+        </div>
+        
+        <nav>
+            <div class="nav-item active" data-tab="dashboard">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="7" height="9"></rect>
+                    <rect x="14" y="3" width="7" height="5"></rect>
+                    <rect x="14" y="12" width="7" height="9"></rect>
+                    <rect x="3" y="16" width="7" height="5"></rect>
+                </svg>
+                Dashboard
+            </div>
+            <div class="nav-item" data-tab="scan">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    <line x1="11" y1="8" x2="11" y2="14"></line>
+                    <line x1="8" y1="11" x2="14" y2="11"></line>
+                </svg>
+                Scan & Organize
+            </div>
+            <div class="nav-item" data-tab="duplicates">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                Duplicates List
+            </div>
+            <div class="nav-item" data-tab="history">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 8v4l3 3"></path>
+                    <circle cx="12" cy="12" r="9"></circle>
+                </svg>
+                History & Rollback
+            </div>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="status-indicator"></div>
+            <div class="status-text">Scanner Engine Offline</div>
+        </div>
+    </aside>
+
+    <!-- Main Content Workspace -->
+    <main>
+        <header>
+            <div class="header-title">
+                <h1 id="header-text">Dashboard</h1>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-secondary" id="quick-scan-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                    Refresh Status
+                </button>
+            </div>
+        </header>
+
+        <div class="content-wrapper">
+            <!-- Toast container -->
+            <div class="toast-container" id="toast-wrapper"></div>
+
+            <!-- TAB 1: DASHBOARD -->
+            <div class="tab-content active" id="tab-dashboard">
+                <!-- Stats row -->
+                <div class="stats-grid">
+                    <div class="glass-card stat-card">
+                        <div class="stat-info">
+                            <span class="stat-label">Analyzed Data</span>
+                            <span class="stat-value" id="stat-data-size">0.00 B</span>
+                        </div>
+                        <div class="stat-icon info">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                        </div>
+                    </div>
+                    
+                    <div class="glass-card stat-card">
+                        <div class="stat-info">
+                            <span class="stat-label">Files Scanned</span>
+                            <span class="stat-value" id="stat-files-count">0</span>
+                        </div>
+                        <div class="stat-icon primary">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                        </div>
+                    </div>
+
+                    <div class="glass-card stat-card">
+                        <div class="stat-info">
+                            <span class="stat-label">Duplicate Files</span>
+                            <span class="stat-value" id="stat-dup-count">0</span>
+                        </div>
+                        <div class="stat-icon warning">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        </div>
+                    </div>
+
+                    <div class="glass-card stat-card">
+                        <div class="stat-info">
+                            <span class="stat-label">Organization Score</span>
+                            <span class="stat-value" id="stat-org-score">-%</span>
+                        </div>
+                        <div class="stat-icon success">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dashboard Grid -->
+                <div class="dashboard-grid">
+                    <!-- Left: Score circle and quick starts -->
+                    <div class="glass-card">
+                        <div class="panel-header">
+                            <div class="panel-title">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                                Organization Score Insight
+                            </div>
+                        </div>
+                        
+                        <div style="display: flex; gap: 40px; align-items: center; justify-content: center; padding: 10px 0;">
+                            <div class="score-container">
+                                <svg class="radial-score-svg">
+                                    <circle class="radial-track" cx="80" cy="80" r="70"></circle>
+                                    <circle class="radial-progress" id="radial-bar" cx="80" cy="80" r="70"></circle>
+                                </svg>
+                                <div class="score-text-overlay">
+                                    <span class="score-number" id="dashboard-score-val">0</span>
+                                    <span class="score-label">Score</span>
+                                </div>
+                            </div>
+                            
+                            <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px;">
+                                <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.05rem; font-weight:600;">Welcome to AI Organizer</h3>
+                                <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.4;">
+                                    This system analyzes your folder hierarchy, highlights unorganized root files, flags exact duplicates using MD5 checksum signatures, and provides smart target routing suggestions.
+                                </p>
+                                <div style="margin-top: 10px;">
+                                    <button class="btn" id="start-organize-shortcut-btn">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                                        Go to Scan Console
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Feed of recommendations -->
+                    <div class="glass-card" style="display: flex; flex-direction: column;">
+                        <div class="panel-header">
+                            <div class="panel-title">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>
+                                Smart Recommendations
+                            </div>
+                        </div>
+                        
+                        <div class="recommendations-feed" id="dashboard-rec-feed">
+                            <div class="empty-state">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                                <p>No recommendations generated yet. Please run a directory scan to begin.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: SCAN & ORGANIZE -->
+            <div class="tab-content" id="tab-scan">
+                <!-- Config Card -->
+                <div class="glass-card scanner-config">
+                    <div class="panel-title">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="15" x2="23" y2="15"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="15" x2="4" y2="15"/></svg>
+                        Target Folder Scanner Configuration
+                    </div>
+                    
+                    <div class="input-group">
+                        <input type="text" class="text-input" id="scan-path-input" placeholder="Input target path (e.g. C:/Users/YourUsername/Downloads)">
+                        <button class="btn" id="run-scan-btn">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            Scan Folder
+                        </button>
+                    </div>
+
+                    <div style="margin-top: 14px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                        <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500;">Quick Folder Presets:</span>
+                        <div class="presets-container" id="preset-chips-box">
+                            <span class="preset-chip" data-preset="Downloads">Downloads</span>
+                            <span class="preset-chip" data-preset="Documents">Documents</span>
+                            <span class="preset-chip" data-preset="Desktop">Desktop</span>
+                        </div>
+                    </div>
+
+                    <!-- Progress Bar & Active Logs -->
+                    <div id="scan-progress-panel" style="display: none;">
+                        <div class="progress-bar-wrapper">
+                            <div class="progress-bar-label">
+                                <span id="progress-status-label">Analyzing directory structures...</span>
+                                <span id="progress-percentage">0%</span>
+                            </div>
+                            <div class="progress-bar-bg">
+                                <div class="progress-bar-fill" id="progress-bar-fill"></div>
+                            </div>
+                        </div>
+                        <div class="console-log-box" id="console-logs">
+                            <div class="console-line console-info">[System] Ready to scan. Choose a folder above.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Analysis Results Panel (Hidden until scanned) -->
+                <div id="analysis-results-box" style="display: none;">
+                    <h2 style="font-family: 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 600; margin-bottom: 14px; display: flex; align-items: center; gap: 8px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                        Scan Analysis & Target Suggestions
+                    </h2>
+                    
+                    <div class="scan-details-wrapper">
+                        <!-- Left Panel: Categories Filters -->
+                        <div class="category-filter-list" id="category-filters-box">
+                            <button class="filter-btn active" data-filter="All">
+                                <span>All Classified Files</span>
+                                <span class="filter-count" id="count-All">0</span>
+                            </button>
+                        </div>
+                        
+                        <!-- Right Panel: Files List -->
+                        <div class="glass-card file-list-card">
+                            <div class="file-list-controls">
+                                <div class="search-wrapper">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                                    <input type="text" class="search-input" id="file-search-input" placeholder="Search filenames...">
+                                </div>
+                                
+                                <div style="display: flex; gap: 12px; align-items: center;">
+                                    <span style="font-size: 0.8rem; color: var(--text-muted);" id="selection-summary">0 files selected</span>
+                                    <button class="btn btn-secondary" id="select-all-btn" style="padding: 6px 14px; font-size: 0.8rem;">Select All</button>
+                                    <button class="btn btn-danger" id="delete-selected-btn" disabled style="padding: 6px 14px; font-size: 0.8rem; display: flex; align-items: center; gap: 4px;">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                                        Delete Selected
+                                    </button>
+                                    <button class="btn" id="execute-moves-btn">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                                        Execute Organization
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="table-scroll">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th class="checkbox-cell">Sel</th>
+                                            <th>File Name</th>
+                                            <th>Category</th>
+                                            <th>Recommended Target Path</th>
+                                            <th>Size</th>
+                                            <th style="width: 80px; text-align: center;">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="files-table-body">
+                                        <!-- Dynamic table elements -->
+                                    </tbody>
+                                </table>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: DUPLICATES -->
+            <div class="tab-content" id="tab-duplicates">
+                <div class="glass-card">
+                    <div class="panel-header">
+                        <div class="panel-title">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            Duplicate Content Manager
+                        </div>
+                    </div>
+                    
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 20px;">
+                        The system checks for identical file signatures using **MD5 hashes**. When duplicates are found, they are grouped together here. During file movements, the system can automatically merge identical files into a single target location to save precious hard drive space.
+                    </p>
+                    
+                    <div class="duplicates-list" id="duplicates-group-container">
+                        <div class="empty-state">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            <p>No duplicates detected. Scan a directory to inspect identical files.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 4: HISTORY & ROLLBACK -->
+            <div class="tab-content" id="tab-history">
+                <div class="glass-card">
+                    <div class="panel-header">
+                        <div class="panel-title">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3"></path><circle cx="12" cy="12" r="9"></circle></svg>
+                            Organization Activity History
+                        </div>
+                    </div>
+                    
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 24px;">
+                        Below is a list of your recent organization batches tracked inside the local SQLite database. If you want to undo any move action, click **Rollback Session** to safely migrate all files back to their exact original folders.
+                    </p>
+                    
+                    <div class="history-section">
+                        <h3 style="font-family: 'Outfit', sans-serif; font-size: 1rem; font-weight: 600; margin-bottom: 10px; color: var(--primary-light);">Organization Batches Timeline</h3>
+                        
+                        <div class="timeline" id="batches-timeline">
+                            <div class="empty-state">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                                <p>No organization history recorded yet. Files moved through the scanner will show up here.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
