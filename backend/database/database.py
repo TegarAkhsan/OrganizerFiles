@@ -1,8 +1,16 @@
 import sqlite3
 import os
+import sys
 from datetime import datetime
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "organizer.db")
+if getattr(sys, 'frozen', False):
+    # Running in a PyInstaller bundle, use the directory of the executable
+    base_dir = os.path.dirname(sys.executable)
+else:
+    # Running in standard Python script mode
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+DB_PATH = os.path.join(base_dir, "organizer.db")
 
 def get_db_connection():
     conn = sqlite3.connect(DB_PATH)

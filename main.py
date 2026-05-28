@@ -1,6 +1,9 @@
 import os
 import json
 import socketserver
+import sys
+import threading
+import webview
 from http.server import SimpleHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 
@@ -12,7 +15,14 @@ from backend.recommendation.recommendation import generate_recommendations
 from backend.mover.mover import execute_organization, rollback_batch
 
 PORT = 8000
-FRONTEND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend")
+
+if getattr(sys, 'frozen', False):
+    # PyInstaller extracts resources to sys._MEIPASS
+    BASE_DIR = sys._MEIPASS
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 
 class ThreadingHTTPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     """Multi-threaded HTTP Server for responsive parallel operations (e.g. scanning while UI remains active)."""
@@ -45,6 +55,8 @@ class APIHandler(SimpleHTTPRequestHandler):
             self.handle_get_history()
         elif path == "/api/batches":
             self.handle_get_batches()
+        elif path == "/api/preview":
+            self.handle_get_preview(parsed_url)
         else:
             # Serve standard static files
             super().do_GET()
@@ -98,6 +110,103 @@ class APIHandler(SimpleHTTPRequestHandler):
     def handle_get_batches(self):
         batches = get_batches()
         self.send_json_response(200, batches)
+
+    def handle_get_preview(self, parsed_url):
+        params = parse_qs(parsed_url.query)
+        file_path = params.get("path", [None])[0]
+        
+        if not file_path:
+            self.send_error(400, "File path is required")
+            return
+            
+        normalized_path = os.path.abspath(file_path)
+        
+        from backend.scanner.scanner import is_protected
+        if is_protected(normalized_path):
+            self.send_error(403, "Access to this file is restricted for safety reasons.")
+            return
+            
+        if not os.path.exists(normalized_path) or not os.path.isfile(normalized_path):
+            self.send_error(404, "File not found")
+            return
+            
+        ext = os.path.splitext(normalized_path)[1].lower()
+        
+        # Comprehensive mapping of direct media streaming extensions
+        media_extensions = {
+            # Images
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".png": "image/png",
+            ".gif": "image/gif",
+            ".svg": "image/svg+xml",
+            ".webp": "image/webp",
+            ".ico": "image/x-icon",
+            # PDF Document
+            ".pdf": "application/pdf",
+            # Video Files
+            ".mp4": "video/mp4",
+            ".webm": "video/webm",
+            # Audio Files
+            ".mp3": "audio/mpeg",
+            ".wav": "audio/wav",
+            ".ogg": "audio/ogg"
+        }
+        
+        # Standard Plain Text & Code extensions whitelist
+        text_extensions = {
+            ".txt", ".log", ".ini", ".cfg", ".conf", ".json", ".xml", ".yaml", ".yml",
+            ".csv", ".tsv", ".md", ".py", ".js", ".ts", ".html", ".css", ".sql", ".sh",
+            ".bat", ".cmd", ".ps1", ".java", ".c", ".cpp", ".h", ".cs", ".go", ".rs",
+            ".rb", ".php", ".aspx", ".jsx", ".tsx", ".toml", ".rst", ".tex"
+        }
+        
+        try:
+            if ext in media_extensions:
+                content_type = media_extensions[ext]
+                with open(normalized_path, "rb") as f:
+                    data = f.read()
+                self.send_response(200)
+                self.send_header("Content-Type", content_type)
+                self.send_header("Accept-Ranges", "bytes")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+            elif ext in text_extensions:
+                # Treat as text for preview, with a fallback
+                # Limit to first 100KB to prevent freezes
+                try:
+                    with open(normalized_path, "r", encoding="utf-8", errors="replace") as f:
+                        text_data = f.read(100 * 1024)
+                    
+                    response_data = {
+                        "success": True,
+                        "type": "text",
+                        "content": text_data,
+                        "filename": os.path.basename(normalized_path),
+                        "file_size": os.path.getsize(normalized_path)
+                    }
+                except Exception:
+                    response_data = {
+                        "success": False,
+                        "type": "binary",
+                        "message": "Binary preview not supported.",
+                        "filename": os.path.basename(normalized_path),
+                        "file_size": os.path.getsize(normalized_path)
+                    }
+                self.send_json_response(200, response_data)
+            else:
+                # Direct fallback for unsupported binary formats (archives, executables, Word, Excel)
+                response_data = {
+                    "success": False,
+                    "type": "binary",
+                    "message": "Binary preview not supported.",
+                    "filename": os.path.basename(normalized_path),
+                    "file_size": os.path.getsize(normalized_path)
+                }
+                self.send_json_response(200, response_data)
+        except Exception as e:
+            self.send_error(500, f"Error reading file: {str(e)}")
 
     def handle_post_scan(self):
         # We need to make sure this handles payload or sends a bad request
@@ -240,16 +349,29 @@ def main():
     print("[AI Organizer] Initializing database...")
     init_db()
     
-    # 2. Boot Local Web Server
+    # 2. Boot Local Web Server in a daemon thread
     print(f"[AI Organizer] Starting server at http://localhost:{PORT}")
     server_address = ('', PORT)
     httpd = ThreadingHTTPServer(server_address, APIHandler)
     
-    try:
-        httpd.serve_forever()
-    except KeyboardInterrupt:
-        print("\n[AI Organizer] Shutting down server safely.")
-        httpd.server_close()
+    server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    server_thread.start()
+    
+    # 3. Open PyWebView GUI window
+    print("[AI Organizer] Starting Desktop GUI...")
+    # Create webview window
+    webview.create_window(
+        "AI Organizer", 
+        f"http://localhost:{PORT}", 
+        width=1200, 
+        height=800,
+        min_size=(1000, 700)
+    )
+    webview.start()
+    
+    # After webview closes, shut down the HTTP server cleanly
+    print("[AI Organizer] Closing server.")
+    httpd.shutdown()
 
 if __name__ == "__main__":
     main()

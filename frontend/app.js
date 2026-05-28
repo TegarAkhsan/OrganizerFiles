@@ -465,6 +465,16 @@ function renderFilesTable() {
         
         const isChecked = STATE.selectedFiles.has(f.filepath);
         
+        // Calculate relative path from scanned root to recommended path
+        let relPath = f.recommended_path || '';
+        if (relPath && STATE.scanResults && STATE.scanResults.scanned_path && relPath.startsWith(STATE.scanResults.scanned_path)) {
+            relPath = relPath.substring(STATE.scanResults.scanned_path.length);
+            while (relPath.startsWith('/') || relPath.startsWith('\\')) {
+                relPath = relPath.substring(1);
+            }
+        }
+        relPath = relPath.replace(/\\/g, '/');
+        
         tr.innerHTML = `
             <td class="checkbox-cell">
                 <div class="custom-checkbox ${isChecked ? 'checked' : ''}" data-path="${f.filepath}">
@@ -479,15 +489,25 @@ function renderFilesTable() {
                 <span class="badge primary">${f.category}</span>
             </td>
             <td>
-                <span style="color: var(--primary-light); font-weight: 500;" title="${f.recommended_path}">${f.recommended_folder_name}/</span>
+                <div class="editable-path-container">
+                    <input type="text" class="editable-path-input" value="${relPath}" title="Target absolute: ${f.recommended_path}" data-filepath="${f.filepath}">
+                    <span class="path-edit-badge" title="Customize target directory">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>
+                    </span>
+                </div>
             </td>
             <td style="color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;">
                 ${f.size_str}
             </td>
             <td style="text-align: center;">
-                <button class="btn btn-danger btn-delete-row" data-path="${f.filepath}" style="padding: 6px 10px; font-size: 0.72rem; border-radius: 6px; box-shadow: none; display: inline-flex; align-items: center; justify-content: center; min-width: unset; margin: 0 auto;" title="Delete File One-by-One">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                </button>
+                <div style="display: flex; gap: 6px; justify-content: center; align-items: center;">
+                    <button class="btn btn-secondary btn-preview-row" data-path="${f.filepath}" style="padding: 6px 10px; font-size: 0.72rem; border-radius: 6px; box-shadow: none; display: inline-flex; align-items: center; justify-content: center; min-width: unset; margin: 0;" title="Preview File">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary-light);"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    </button>
+                    <button class="btn btn-danger btn-delete-row" data-path="${f.filepath}" style="padding: 6px 10px; font-size: 0.72rem; border-radius: 6px; box-shadow: none; display: inline-flex; align-items: center; justify-content: center; min-width: unset; margin: 0;" title="Delete File One-by-One">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2 2v2"></path></svg>
+                    </button>
+                </div>
             </td>
         `;
 
@@ -495,6 +515,39 @@ function renderFilesTable() {
         const chk = tr.querySelector('.custom-checkbox');
         chk.addEventListener('click', (e) => {
             toggleFileCheckbox(f.filepath, chk);
+        });
+
+        // Inline path editing event handler
+        const pathInput = tr.querySelector('.editable-path-input');
+        pathInput.addEventListener('input', (e) => {
+            const newRelPath = e.target.value.trim().replace(/\\/g, '/');
+            
+            // Build the absolute target folder path
+            let newAbsPath = STATE.scanResults.scanned_path;
+            if (newRelPath) {
+                let cleanedRel = newRelPath;
+                while (cleanedRel.startsWith('/')) cleanedRel = cleanedRel.substring(1);
+                while (cleanedRel.endsWith('/')) cleanedRel = cleanedRel.substring(0, cleanedRel.length - 1);
+                
+                if (cleanedRel) {
+                    newAbsPath = newAbsPath + '/' + cleanedRel;
+                }
+            }
+            newAbsPath = newAbsPath.replace(/\\/g, '/');
+            
+            // Update the file object in both global results state and current UI selection references
+            f.recommended_path = newAbsPath;
+            f.recommended_folder_name = newRelPath.split('/').pop() || '';
+            
+            // Highlight validation helper in input element tooltip
+            pathInput.title = `Target absolute: ${newAbsPath}`;
+        });
+
+        // Individual row preview events
+        const prevBtn = tr.querySelector('.btn-preview-row');
+        prevBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            showPreview(f.filepath, f.filename);
         });
 
         // Individual row delete events (Delete One-by-One)
@@ -596,7 +649,12 @@ async function approveAndMoveFiles() {
     const count = STATE.selectedFiles.size;
     
     // Warn before starting
-    const confirmAction = confirm(`WARNING: You are about to move ${count} files to their recommended subdirectories. Is this correct?`);
+    const confirmAction = await showConfirm(
+        "Execute Organization",
+        `You are about to move <strong>${count} file(s)</strong> to their recommended subdirectories. Are you sure you want to proceed?`,
+        false,
+        "Organize Files"
+    );
     if (!confirmAction) return;
 
     // Gather file objects that match selected paths
@@ -748,7 +806,12 @@ async function loadActivityHistory() {
 
 // Dispatch Batch Rollbacks
 async function triggerBatchRollback(batchId, buttonElement) {
-    const confirmUndo = confirm("WARNING: Are you absolutely sure you want to rollback this session? This will move all files in this batch back to their original folder paths.");
+    const confirmUndo = await showConfirm(
+        "Rollback Session",
+        "WARNING: Are you absolutely sure you want to rollback this session? This will move all files in this batch back to their original folder paths.",
+        true,
+        "Rollback Session"
+    );
     if (!confirmUndo) return;
 
     const prevText = buttonElement.innerHTML;
@@ -830,7 +893,12 @@ window.triggerBatchRollback = triggerBatchRollback;
 
 // Deletion Operations implementation
 async function deleteOneFile(filepath, filename) {
-    const confirmDel = confirm(`Are you absolutely sure you want to permanently delete:\n${filename}?\n\nThis action CANNOT be undone.`);
+    const confirmDel = await showConfirm(
+        "Delete File",
+        `Are you absolutely sure you want to permanently delete:<br><strong>${filename}</strong>?<br><br>This action CANNOT be undone.`,
+        true,
+        "Delete File"
+    );
     if (!confirmDel) return;
     
     await executeDeletion([filepath]);
@@ -840,7 +908,12 @@ async function deleteSelectedFiles() {
     const count = STATE.selectedFiles.size;
     if (count === 0) return;
     
-    const confirmDel = confirm(`WARNING: You are about to permanently delete the ${count} selected file(s)!\n\nThis action CANNOT be undone. Are you sure you want to proceed?`);
+    const confirmDel = await showConfirm(
+        "Delete Selected Files",
+        `WARNING: You are about to permanently delete the <strong>${count} selected file(s)</strong>!<br><br>This action CANNOT be undone. Are you sure you want to proceed?`,
+        true,
+        "Delete Selected"
+    );
     if (!confirmDel) return;
     
     const filepaths = Array.from(STATE.selectedFiles);
@@ -876,5 +949,265 @@ async function executeDeletion(filepaths) {
         console.error(err);
     }
 }
+
+/**
+ * Beautiful glassmorphic confirmation modal instead of browser native confirm().
+ */
+function showConfirm(title, message, isDanger = false, confirmText = "Confirm") {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'confirm-modal-overlay';
+        
+        const iconSvg = isDanger 
+            ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`
+            : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`;
+            
+        overlay.innerHTML = `
+            <div class="confirm-modal-box">
+                <div class="confirm-modal-header">
+                    <div class="confirm-modal-icon ${isDanger ? 'danger' : 'primary'}">
+                        ${iconSvg}
+                    </div>
+                    <div class="confirm-modal-title">${title}</div>
+                </div>
+                <div class="confirm-modal-body">
+                    ${message}
+                </div>
+                <div class="confirm-modal-footer">
+                    <button class="confirm-modal-btn cancel" id="confirm-modal-cancel-btn">Cancel</button>
+                    <button class="confirm-modal-btn confirm ${isDanger ? 'danger' : ''}" id="confirm-modal-confirm-btn">${confirmText}</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(overlay);
+        
+        // Trigger transition
+        setTimeout(() => {
+            overlay.classList.add('show');
+        }, 20);
+        
+        const cleanup = (result) => {
+            overlay.classList.remove('show');
+            document.removeEventListener('keydown', handleKeyDown);
+            setTimeout(() => {
+                overlay.remove();
+                resolve(result);
+            }, 200);
+        };
+        
+        const onConfirm = () => cleanup(true);
+        const onCancel = () => cleanup(false);
+        
+        overlay.querySelector('#confirm-modal-confirm-btn').addEventListener('click', onConfirm);
+        overlay.querySelector('#confirm-modal-cancel-btn').addEventListener('click', onCancel);
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                onCancel();
+            }
+        });
+        
+        function handleKeyDown(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                onConfirm();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                onCancel();
+            }
+        }
+        document.addEventListener('keydown', handleKeyDown);
+    });
+}
+
+/**
+ * Premium glassmorphic inline file preview modal.
+ * Fetches preview content from the server API and renders images or safe escaped text.
+ */
+function showPreview(filepath, filename) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'preview-modal-overlay';
+        
+        overlay.innerHTML = `
+            <div class="preview-modal-box">
+                <div class="preview-modal-header">
+                    <div class="preview-modal-title">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary-light);"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                        File Preview: <span style="color: var(--primary-light);">${filename}</span>
+                    </div>
+                    <button class="btn-close-modal" id="preview-modal-close-btn" title="Close Preview">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>
+                <div class="preview-modal-body" id="preview-body-container">
+                    <div class="empty-state">
+                        <svg class="floating" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                        <p>Loading file preview content...</p>
+                    </div>
+                </div>
+                <div class="preview-modal-footer">
+                    <span class="preview-file-size" id="preview-size-badge">Calculating size...</span>
+                    <button class="btn btn-secondary" id="preview-modal-close-footer-btn" style="padding: 8px 18px; font-size: 0.82rem;">Close</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(overlay);
+        
+        // Trigger fade in transition
+        setTimeout(() => {
+            overlay.classList.add('show');
+        }, 20);
+        
+        const cleanup = () => {
+            overlay.classList.remove('show');
+            document.removeEventListener('keydown', handleKeyDown);
+            setTimeout(() => {
+                // Ensure all media elements are stopped when closed
+                const video = overlay.querySelector('video');
+                if (video) {
+                    video.pause();
+                    video.src = "";
+                }
+                const audio = overlay.querySelector('audio');
+                if (audio) {
+                    audio.pause();
+                    audio.src = "";
+                }
+                overlay.remove();
+                resolve();
+            }, 200);
+        };
+        
+        overlay.querySelector('#preview-modal-close-btn').addEventListener('click', cleanup);
+        overlay.querySelector('#preview-modal-close-footer-btn').addEventListener('click', cleanup);
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                cleanup();
+            }
+        });
+        
+        function handleKeyDown(e) {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                cleanup();
+            }
+        }
+        document.addEventListener('keydown', handleKeyDown);
+        
+        const ext = filename.split('.').pop().toLowerCase();
+        const bodyContainer = overlay.querySelector('#preview-body-container');
+        const sizeBadge = overlay.querySelector('#preview-size-badge');
+        
+        const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'ico'];
+        const videoExtensions = ['mp4', 'webm'];
+        const audioExtensions = ['mp3', 'wav', 'ogg'];
+        const pdfExtensions = ['pdf'];
+        const textExtensions = [
+            'txt', 'log', 'ini', 'cfg', 'conf', 'json', 'xml', 'yaml', 'yml',
+            'csv', 'tsv', 'md', 'py', 'js', 'ts', 'html', 'css', 'sql', 'sh',
+            'bat', 'cmd', 'ps1', 'java', 'c', 'cpp', 'h', 'cs', 'go', 'rs',
+            'rb', 'php', 'aspx', 'jsx', 'tsx', 'toml', 'rst', 'tex'
+        ];
+        
+        // Build the safe endpoint preview URI
+        const previewUrl = `/api/preview?path=${encodeURIComponent(filepath)}`;
+        
+        if (pdfExtensions.includes(ext)) {
+            // 1. PDF Embedding inside high-performance native WebView2 iframe container
+            bodyContainer.innerHTML = `<iframe class="pdf-preview-element" src="${previewUrl}"></iframe>`;
+            sizeBadge.innerText = "PDF Document Content";
+        } else if (imageExtensions.includes(ext)) {
+            // 2. Direct Image Embedding
+            bodyContainer.innerHTML = `<img class="image-preview-element" src="${previewUrl}" alt="${filename}">`;
+            sizeBadge.innerText = "Image Loaded Successfully";
+        } else if (videoExtensions.includes(ext)) {
+            // 3. Hardware accelerated HTML5 Video Player
+            bodyContainer.innerHTML = `<video class="video-preview-element" src="${previewUrl}" controls autoplay></video>`;
+            sizeBadge.innerText = "Video File Content";
+        } else if (audioExtensions.includes(ext)) {
+            // 4. Compact elegant Audio Player widget
+            bodyContainer.innerHTML = `
+                <div class="binary-preview-container" style="padding: 30px;">
+                    <svg class="floating" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--primary-light)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary-light);"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+                    <audio class="audio-preview-element" src="${previewUrl}" controls autoplay></audio>
+                    <span style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 15px;">${filename}</span>
+                </div>
+            `;
+            sizeBadge.innerText = "Audio Stream Active";
+        } else if (textExtensions.includes(ext)) {
+            // 5. Fetch code/plain text up to 100KB safely
+            fetch(previewUrl)
+                .then(res => {
+                    if (!res.ok) throw new Error("Unable to read text content.");
+                    return res.json();
+                })
+                .then(data => {
+                    if (data.success && data.type === "text") {
+                        const escaped = data.content
+                            .replace(/&/g, "&amp;")
+                            .replace(/</g, "&lt;")
+                            .replace(/>/g, "&gt;")
+                            .replace(/"/g, "&quot;")
+                            .replace(/'/g, "&#039;");
+                            
+                        bodyContainer.innerHTML = `<pre class="text-preview-element">${escaped}</pre>`;
+                        
+                        let sizeStr = "0.00 B";
+                        const bytes = data.file_size;
+                        if (bytes > 0) {
+                            if (bytes < 1024) sizeStr = `${bytes} B`;
+                            else if (bytes < 1024 * 1024) sizeStr = `${(bytes/1024).toFixed(2)} KB`;
+                            else sizeStr = `${(bytes/(1024*1024)).toFixed(2)} MB`;
+                        }
+                        sizeBadge.innerText = sizeStr;
+                    } else {
+                        throw new Error("Text parser failed.");
+                    }
+                })
+                .catch(err => {
+                    bodyContainer.innerHTML = `
+                        <div class="binary-preview-container" style="color: var(--danger);">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                            <p style="font-size: 0.9rem; margin-top: 10px;">Failed to load text preview.</p>
+                            <p style="font-size: 0.76rem; color: var(--text-muted);">${err.message}</p>
+                        </div>
+                    `;
+                    sizeBadge.innerText = "Error";
+                });
+        } else {
+            // 6. Direct fallbacks for unsupported binary formats (Archives, Word, Excel, PowerPoint, EXE)
+            let fileTypeLabel = "Binary File";
+            let fileTypeDesc = "Inline preview not supported for binary file types.";
+            let iconColor = "var(--text-muted)";
+            
+            if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) {
+                fileTypeLabel = "Compressed Archive";
+                fileTypeDesc = "This is a compressed archive. You can safely organize it into your 'Archives' folder.";
+                iconColor = "var(--warning)";
+            } else if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) {
+                fileTypeLabel = "Office Document";
+                fileTypeDesc = "Microsoft Office documents cannot be previewed directly in this simplified viewer.";
+                iconColor = "var(--info)";
+            } else if (['exe', 'msi', 'apk', 'dmg', 'iso'].includes(ext)) {
+                fileTypeLabel = "System Installer / Executable";
+                fileTypeDesc = "This is an executable installer. Preview is disabled for security and safety reasons.";
+                iconColor = "var(--primary-light)";
+            }
+            
+            bodyContainer.innerHTML = `
+                <div class="binary-preview-container">
+                    <svg class="binary-preview-icon" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                    <h3 style="font-family: 'Outfit', sans-serif; font-size: 1.1rem; color: #fff; margin-top: 14px; font-weight: 600;">${fileTypeLabel}</h3>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); text-align: center; max-width: 320px; line-height: 1.4; margin-top: 8px;">${fileTypeDesc}</p>
+                    <p style="font-size: 0.74rem; color: var(--text-muted); margin-top: 12px; font-style: italic;">This file is ready and will be organized cleanly.</p>
+                </div>
+            `;
+            sizeBadge.innerText = "Binary Format";
+        }
+    });
+}
+
 
 
