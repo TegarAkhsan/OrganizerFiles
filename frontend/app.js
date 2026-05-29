@@ -51,6 +51,28 @@ function initApp() {
 
     // 3. Scan triggers
     document.getElementById('run-scan-btn').addEventListener('click', executeScan);
+    
+    const browseBtn = document.getElementById('browse-folder-btn');
+    if (browseBtn) {
+        browseBtn.addEventListener('click', async () => {
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.select_folder) {
+                try {
+                    const selectedPath = await window.pywebview.api.select_folder();
+                    if (selectedPath) {
+                        const cleanPath = selectedPath.replace(/\\/g, '/');
+                        document.getElementById('scan-path-input').value = cleanPath;
+                        showToast(`Selected Folder: ${cleanPath}`, 'success');
+                    }
+                } catch (err) {
+                    console.error("Error choosing directory:", err);
+                    showToast("Failed to open folder picker.", 'danger');
+                }
+            } else {
+                showToast("Desktop API not initialized or not running in GUI mode.", 'warning');
+            }
+        });
+    }
+
     document.getElementById('quick-scan-btn').addEventListener('click', () => {
         const path = document.getElementById('scan-path-input').value;
         if (path) {

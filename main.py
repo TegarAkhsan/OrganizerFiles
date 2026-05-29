@@ -344,6 +344,19 @@ class APIHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(json.dumps(data).encode('utf-8'))
 
+class Api:
+    def select_folder(self):
+        """Open a native folder picker dialog and return the selected path."""
+        try:
+            win = webview.active_window() or (webview.windows[0] if webview.windows else None)
+            if win:
+                result = win.create_file_dialog(webview.FOLDER_DIALOG)
+                if result and len(result) > 0:
+                    return result[0]
+        except Exception as e:
+            print(f"[API Error] Failed to open folder dialog: {e}")
+        return None
+
 def main():
     # 1. Initialize SQLite Database Tables
     print("[AI Organizer] Initializing database...")
@@ -359,13 +372,15 @@ def main():
     
     # 3. Open PyWebView GUI window
     print("[AI Organizer] Starting Desktop GUI...")
+    api = Api()
     # Create webview window
-    webview.create_window(
+    window = webview.create_window(
         "AI Organizer", 
         f"http://localhost:{PORT}", 
         width=1200, 
         height=800,
-        min_size=(1000, 700)
+        min_size=(1000, 700),
+        js_api=api
     )
     webview.start()
     
